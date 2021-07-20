@@ -12,6 +12,7 @@ enum Command {
     Remove(String),
 }
 
+#[derive(Debug)]
 struct CommandInfo {
     pos: u64,
     len: u64,
@@ -28,11 +29,40 @@ impl KVDB {
         if !Path::new(path).exists() {
             File::create(path)?;
         }
-        Ok(KVDB {
+        let mut db = KVDB {
             writer: BufWriterWithPos::new(OpenOptions::new().append(true).open(path)?)?,
             reader: BufReaderWithPos::new(OpenOptions::new().read(true).open(path)?)?,
             index: HashMap::new(),
-        })
+        };
+        db.start()?;
+        Ok(db)
+    }
+
+    pub fn start(&mut self) -> io::Result<()> {
+        println!("正在构建内存索引......");
+        let reader = &mut self.reader;
+        let mut pos = reader.seek(SeekFrom::Start(0))?;
+        let mut iter = serde_json::Deserializer::from_reader(reader).into_iter::<Command>();
+        while let Some(cmd) = iter.next() {
+            let new_pos = iter.byte_offset() as u64;
+            match cmd? {
+                Command::Set(k, _) => {
+                    self.index.insert(
+                        k,
+                        CommandInfo {
+                            pos,
+                            len: new_pos - pos,
+                        },
+                    );
+                }
+                Command::Remove(k) => {
+                    self.index.remove(&k);
+                }
+            }
+            pos = new_pos;
+        }
+        println!("内存索引构建完成");
+        Ok(())
     }
 
     pub fn set(&mut self, k: String, v: impl Serialize) -> io::Result<()> {
@@ -44,7 +74,7 @@ impl KVDB {
             k,
             CommandInfo {
                 pos,
-                len: self.writer.pos - pos - 1,
+                len: self.writer.pos - pos,
             },
         );
         Ok(())
@@ -73,7 +103,7 @@ impl KVDB {
         let cmd = Command::Remove(k.clone());
         self.writer.writeln(cmd)?;
         self.writer.flush()?;
-        self.index.remove(&k).unwrap();
+        self.index.remove(&k);
         Ok(())
     }
 }

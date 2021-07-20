@@ -1,5 +1,6 @@
-use serde::{Deserialize, Serialize};
 use std::io;
+
+use rand::Rng;
 
 use crate::core::KVDB;
 
@@ -7,42 +8,20 @@ mod core;
 
 fn main() -> io::Result<()> {
     let mut db = KVDB::new("0.log")?;
-    db.set(String::from("kvdb"), true)?;
-    db.set(String::from("author"), "Aniki")?;
-    db.set(String::from("version"), 0)?;
-    db.set(String::from("version"), 1)?;
-    db.set(
-        String::from("user-1"),
-        Person {
-            name: String::from("Loren Lausi"),
-            age: 15,
-        },
-    )?;
-    db.set(
-        String::from("user-2"),
-        Person {
-            name: String::from("Daiv Oiqud"),
-            age: 99,
-        },
-    )?;
-    db.set(
-        String::from("user-1"),
-        Person {
-            name: String::from("Sadkuren Zoack"),
-            age: 1,
-        },
-    )?;
-    db.remove(String::from("user-1"))?;
-    println!("{:#?}", db.get(String::from("user-1"))?);
-    println!(
-        "{:#?}",
-        serde_json::from_str::<Person>(&db.get(String::from("user-2"))?.unwrap())?
-    );
+    let mut rng = rand::thread_rng();
+    let k = format!("user::{}", rng.gen_range(0..100));
+    if let Some(value) = db.get(k.clone())? {
+        println!("{} => {}", k, serde_json::from_str::<i32>(&value)?);
+    } else {
+        println!("key[{}] doesn't exist", k);
+    }
+    for _ in 0..50 {
+        let k = format!("user::{}", rng.gen_range(0..100));
+        if rng.gen::<f64>() < 0.2 {
+            db.remove(k)?;
+        } else {
+            db.set(k, rng.gen::<i32>())?;
+        }
+    }
     Ok(())
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Person {
-    name: String,
-    age: usize,
 }
