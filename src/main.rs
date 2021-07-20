@@ -32,7 +32,12 @@ fn main() -> io::Result<()> {
             age: 1,
         },
     )?;
-    println!("{:#?}", db.get(String::from("user-1"))?.unwrap());
+    db.remove(String::from("user-1"))?;
+    println!("{:#?}", db.get(String::from("user-1"))?);
+    println!(
+        "{:#?}",
+        serde_json::from_str::<Person>(&db.get(String::from("user-2"))?.unwrap())?
+    );
     Ok(())
 }
 

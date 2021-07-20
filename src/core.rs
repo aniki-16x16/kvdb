@@ -37,14 +37,14 @@ impl KVDB {
 
     pub fn set(&mut self, k: String, v: impl Serialize) -> io::Result<()> {
         let pos = self.writer.pos;
-        let cmd = Command::Set(k.clone(), serde_json::to_string(&v).unwrap());
-        serde_json::to_writer(&mut self.writer, &cmd)?;
+        let cmd = Command::Set(k.clone(), serde_json::to_string(&v)?);
+        self.writer.writeln(cmd)?;
         self.writer.flush()?;
         self.index.insert(
             k,
             CommandInfo {
                 pos,
-                len: self.writer.pos - pos,
+                len: self.writer.pos - pos - 1,
             },
         );
         Ok(())
@@ -68,6 +68,14 @@ impl KVDB {
             }
         }
     }
+
+    pub fn remove(&mut self, k: String) -> io::Result<()> {
+        let cmd = Command::Remove(k.clone());
+        self.writer.writeln(cmd)?;
+        self.writer.flush()?;
+        self.index.remove(&k).unwrap();
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -82,6 +90,12 @@ impl<W: Write + Seek> BufWriterWithPos<W> {
             pos: inner.seek(SeekFrom::End(0))?,
             writer: BufWriter::new(inner),
         })
+    }
+
+    fn writeln(&mut self, value: impl Serialize) -> io::Result<usize> {
+        let mut tmp = serde_json::to_vec(&value)?;
+        tmp.push(b'\n');
+        self.write(&tmp)
     }
 }
 
