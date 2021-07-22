@@ -29,7 +29,8 @@ pub struct KVDB {
 }
 
 impl KVDB {
-    pub fn new() -> io::Result<Self> {
+    /// `log_size` 以MB为单位
+    pub fn new(log_size: u64) -> io::Result<Self> {
         let mut reader = HashMap::new();
         let mut logs = if !Path::new("logs/").is_dir() {
             fs::create_dir("logs")?;
@@ -81,7 +82,7 @@ impl KVDB {
             readers: reader,
             index: HashMap::new(),
             cur_log_idx: cur_log_index,
-            log_size: 64 * 1024 * 1024, // 默认日志阈值，超过后压缩日志
+            log_size: log_size * 1024 * 1024, // 默认日志阈值，超过后压缩日志
         };
         println!("正在构建内存索引......");
         for log_idx in logs {
